@@ -1,10 +1,9 @@
-import asyncio
 import os
 import glob
 import yaml
 from pathlib import Path
+from contextlib import asynccontextmanager
 from dotenv import load_dotenv
-import litellm
 from core.orchestrator import OrchestratorBrain
 from fastapi import FastAPI
 from fastapi.responses import FileResponse
@@ -14,7 +13,6 @@ import uvicorn
 # Load environment variables (API keys) from .env
 load_dotenv("api.env")
 
-app = FastAPI(title="OctAgent Boardroom")
 brain = None
 BASE_DIR = Path(__file__).resolve().parent
 PERSONAS_DIR = BASE_DIR / "personas"
@@ -23,15 +21,15 @@ TEMPLATES_DIR = BASE_DIR / "templates"
 class TaskRequest(BaseModel):
     task: str
 
-@app.on_event("startup")
-async def startup_event():
+
+async def initialize_brain():
     global brain
     print("🐙 Booting OctAgent Boardroom...")
-    
+
     # Ensure personas directory exists
     PERSONAS_DIR.mkdir(parents=True, exist_ok=True)
     persona_files = glob.glob(str(PERSONAS_DIR / "*.yaml"))
-    
+
     if not persona_files:
         print("⚠️  No personas found. Generating default 'Genesis' persona...")
         with open(PERSONAS_DIR / "genesis.yaml", "w") as f:
@@ -54,6 +52,16 @@ async def startup_event():
 
     print(f"✅ Loaded {len(arm_configs)} Arms into the Consensus Engine.")
     brain = OrchestratorBrain(arm_configs)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await initialize_brain()
+    yield
+
+
+app = FastAPI(title="OctAgent Boardroom", lifespan=lifespan)
+
 
 @app.get("/")
 async def read_index():
