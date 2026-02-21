@@ -2,17 +2,47 @@ import asyncio
 import os
 import glob
 import yaml
+from pathlib import Path
+from dotenv import load_dotenv
+import litellm
 from core.orchestrator import OrchestratorBrain
+from fastapi import FastAPI
+from fastapi.responses import FileResponse
+from pydantic import BaseModel
+import uvicorn
 
-async def main():
+# Load environment variables (API keys) from .env
+load_dotenv("api.env")
+
+app = FastAPI(title="OctAgent Boardroom")
+brain = None
+BASE_DIR = Path(__file__).resolve().parent
+PERSONAS_DIR = BASE_DIR / "personas"
+TEMPLATES_DIR = BASE_DIR / "templates"
+
+class TaskRequest(BaseModel):
+    task: str
+
+@app.on_event("startup")
+async def startup_event():
+    global brain
     print("🐙 Booting OctAgent Boardroom...")
     
-    # Dynamically load all personas from the YAML directory
-    # This implements the "Swappable Personas" architecture natively.
-    persona_files = glob.glob("personas/*.yaml")
+    # Ensure personas directory exists
+    PERSONAS_DIR.mkdir(parents=True, exist_ok=True)
+    persona_files = glob.glob(str(PERSONAS_DIR / "*.yaml"))
+    
     if not persona_files:
-        print("ERROR: No YAML files found in the 'personas/' directory.")
-        return
+        print("⚠️  No personas found. Generating default 'Genesis' persona...")
+        with open(PERSONAS_DIR / "genesis.yaml", "w") as f:
+            yaml.dump({
+                "name": "Genesis",
+                "persona": "You are the first agent. You are helpful and concise.",
+                "owns": "Bootstrapping",
+                "can_veto": False,
+                "model": "gpt-4o-mini"
+            }, f)
+        persona_files = glob.glob(str(PERSONAS_DIR / "*.yaml"))
 
     arm_configs = {}
     for file_path in persona_files:
@@ -23,25 +53,24 @@ async def main():
             arm_configs[name] = config
 
     print(f"✅ Loaded {len(arm_configs)} Arms into the Consensus Engine.")
-    
-    # Initialize the Orchestrator (from your v0.3 code)
     brain = OrchestratorBrain(arm_configs)
+
+@app.get("/")
+async def read_index():
+    landing_page = TEMPLATES_DIR / "login.html"
+    if not landing_page.exists():
+        return "ERROR: templates/login.html not found."
+    return FileResponse(landing_page)
+
+@app.post("/api/process")
+async def process_task(request: TaskRequest):
+    if not brain:
+        return {"status": "ERROR", "reason": "Brain not initialized"}
     
-    # Interactive CLI Loop
-    while True:
-        try:
-            print("\n" + "="*50)
-            user_task = input("Enter a task for the boardroom (or 'exit' to quit):\n> ")
-            if user_task.lower() in ['exit', 'quit']:
-                break
-                
-            # Execute the fan-out boardroom vote
-            await brain.process_high_stakes_action(user_task)
-            
-        except KeyboardInterrupt:
-            print("\nShutting down OctAgent...")
-            break
+    # Execute the fan-out boardroom vote and return the result JSON
+    result = await brain.process_high_stakes_action(request.task)
+    return result
 
 if __name__ == "__main__":
-    # Ensure standard asyncio event loop behavior across OS platforms
-    asyncio.run(main())
+    # Run the web server
+    uvicorn.run(app, host="0.0.0.0", port=8000)

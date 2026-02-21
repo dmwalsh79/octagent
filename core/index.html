@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OctAgent Boardroom</title>
+    <style>
+        :root {
+            --bg: #0d1117;
+            --term: #161b22;
+            --text: #c9d1d9;
+            --accent: #58a6ff;
+            --green: #238636;
+            --red: #da3633;
+        }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: 'Courier New', monospace;
+            padding: 2rem;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            border-bottom: 1px solid #30363d;
+            padding-bottom: 10px;
+        }
+
+        .container {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        textarea {
+            background: var(--term);
+            border: 1px solid #30363d;
+            color: var(--text);
+            padding: 15px;
+            width: 100%;
+            height: 100px;
+            font-family: inherit;
+            resize: vertical;
+            box-sizing: border-box;
+        }
+
+        button {
+            background: var(--green);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            cursor: pointer;
+            font-weight: bold;
+            font-family: inherit;
+        }
+
+        button:hover {
+            opacity: 0.9;
+        }
+
+        button:disabled {
+            background: #30363d;
+            cursor: not-allowed;
+        }
+
+        .result-box {
+            background: var(--term);
+            border: 1px solid #30363d;
+            padding: 20px;
+            display: none;
+        }
+
+        .vote-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .vote-card {
+            background: #0d1117;
+            border: 1px solid #30363d;
+            padding: 10px;
+            font-size: 0.9em;
+        }
+
+        .vote-card.yes {
+            border-left: 4px solid var(--green);
+        }
+
+        .vote-card.no {
+            border-left: 4px solid var(--red);
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+
+        .APPROVED {
+            background: rgba(35, 134, 54, 0.2);
+            color: #3fb950;
+            border: 1px solid var(--green);
+        }
+
+        .REJECTED {
+            background: rgba(218, 54, 51, 0.2);
+            color: #f85149;
+            border: 1px solid var(--red);
+        }
+
+        .VETOED {
+            background: rgba(218, 54, 51, 0.4);
+            color: white;
+            border: 1px solid var(--red);
+            text-transform: uppercase;
+        }
+
+        .loader {
+            display: none;
+            color: var(--accent);
+            margin-top: 10px;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>🐙 OctAgent Boardroom</h1>
+    <div class="container">
+        <div>
+            <label>ENTER HIGH-STAKES TASK:</label>
+            <textarea id="taskInput" placeholder="e.g., Deploy the production database migration script..."></textarea>
+            <button id="submitBtn" onclick="submitTask()">INITIATE VOTE</button>
+            <div id="loader" class="loader">>> CONVENING BOARDROOM... PLEASE WAIT...</div>
+        </div>
+
+        <div id="resultArea" class="result-box">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <h2 style="margin:0;">Consensus Result</h2>
+                <span id="statusBadge" class="status-badge">PENDING</span>
+            </div>
+            <p><strong>Reason:</strong> <span id="reasonText"></span></p>
+            <p><small>Cost: $<span id="costText">0.00000</span></small></p>
+
+            <h3>🗳️ Board Votes</h3>
+            <div id="voteGrid" class="vote-grid"></div>
+        </div>
+    </div>
+
+    <script>
+        async function submitTask() {
+            const task = document.getElementById('taskInput').value;
+            if (!task) return;
+
+            document.getElementById('submitBtn').disabled = true;
+            document.getElementById('loader').style.display = 'block';
+            document.getElementById('resultArea').style.display = 'none';
+
+            try {
+                const response = await fetch('/api/process', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ task: task })
+                });
+                const data = await response.json();
+                renderResult(data);
+            } catch (e) {
+                alert("Connection Error: " + e);
+            } finally {
+                document.getElementById('submitBtn').disabled = false;
+                document.getElementById('loader').style.display = 'none';
+            }
+        }
+
+        function renderResult(data) {
+            const resultArea = document.getElementById('resultArea');
+            const statusBadge = document.getElementById('statusBadge');
+            const voteGrid = document.getElementById('voteGrid');
+
+            resultArea.style.display = 'block';
+            statusBadge.className = `status-badge ${data.status}`;
+            statusBadge.innerText = data.status;
+            document.getElementById('reasonText').innerText = data.reason;
+            document.getElementById('costText').innerText = data.cost.toFixed(5);
+
+            voteGrid.innerHTML = '';
+            data.votes.forEach(v => {
+                const card = document.createElement('div');
+                card.className = `vote-card ${v.vote ? 'yes' : 'no'}`;
+                card.innerHTML = `
+                    <strong>${v.arm}</strong> ${v.is_veto ? '🚫 VETO' : ''}<br>
+                    <div style="margin-top:5px; color:#8b949e;">${v.reasoning}</div>
+                `;
+                voteGrid.appendChild(card);
+            });
+        }
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OctAgent Access</title>
+    <style>
+        :root {
+            --bg0: #0b1220;
+            --bg1: #121b2e;
+            --panel: rgba(13, 22, 40, 0.9);
+            --line: #2d3f65;
+            --text: #d7e4ff;
+            --muted: #93a7cf;
+            --ok: #1f9d66;
+            --bad: #c14444;
+            --accent: #3a7bfd;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+            color: var(--text);
+            background:
+                radial-gradient(circle at 10% 10%, #1e3158 0%, transparent 40%),
+                radial-gradient(circle at 90% 20%, #162a4d 0%, transparent 35%),
+                linear-gradient(170deg, var(--bg0), var(--bg1));
+            display: grid;
+            place-items: center;
+            padding: 20px;
+        }
+
+        .shell {
+            width: min(980px, 100%);
+            border: 1px solid var(--line);
+            border-radius: 14px;
+            background: var(--panel);
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+            overflow: hidden;
+        }
+
+        .header {
+            padding: 18px 20px;
+            border-bottom: 1px solid var(--line);
+            background: rgba(0, 0, 0, 0.15);
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 1.3rem;
+            letter-spacing: 0.4px;
+        }
+
+        .content {
+            padding: 18px;
+            display: grid;
+            gap: 16px;
+        }
+
+        .card {
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            padding: 14px;
+            background: rgba(8, 13, 24, 0.7);
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: var(--muted);
+            font-size: 0.9rem;
+        }
+
+        input,
+        textarea {
+            width: 100%;
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            background: #0f1a30;
+            color: var(--text);
+            padding: 10px;
+            font: inherit;
+        }
+
+        textarea {
+            min-height: 110px;
+            resize: vertical;
+        }
+
+        .row {
+            display: grid;
+            gap: 12px;
+            grid-template-columns: 1fr 1fr;
+        }
+
+        button {
+            border: 0;
+            border-radius: 8px;
+            background: var(--accent);
+            color: white;
+            padding: 10px 14px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        button:disabled {
+            cursor: not-allowed;
+            opacity: 0.65;
+        }
+
+        .status {
+            margin-top: 10px;
+            color: var(--muted);
+            min-height: 1.2em;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 0.84rem;
+            font-weight: 700;
+        }
+
+        .APPROVED {
+            background: rgba(31, 157, 102, 0.2);
+            border: 1px solid var(--ok);
+            color: #7ff0b7;
+        }
+
+        .REJECTED,
+        .VETOED,
+        .FAILED {
+            background: rgba(193, 68, 68, 0.2);
+            border: 1px solid var(--bad);
+            color: #ffc3c3;
+        }
+
+        .votes {
+            margin-top: 12px;
+            display: grid;
+            gap: 10px;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        }
+
+        .vote {
+            border: 1px solid var(--line);
+            border-left: 4px solid var(--accent);
+            border-radius: 8px;
+            padding: 10px;
+            background: #0f1a30;
+            font-size: 0.9rem;
+        }
+
+        .vote.no {
+            border-left-color: var(--bad);
+        }
+
+        @media (max-width: 700px) {
+            .row {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <main class="shell">
+        <section class="header">
+            <h1>OctAgent Boardroom Access</h1>
+        </section>
+        <section class="content">
+            <article id="loginCard" class="card">
+                <h2>Login</h2>
+                <p style="color:var(--muted); margin-top:0;">Use any non-empty credentials to unlock the query console.</p>
+                <div class="row">
+                    <div>
+                        <label for="username">Username</label>
+                        <input id="username" autocomplete="username" placeholder="operator" />
+                    </div>
+                    <div>
+                        <label for="password">Password</label>
+                        <input id="password" type="password" autocomplete="current-password" placeholder="••••••••" />
+                    </div>
+                </div>
+                <div style="margin-top:12px; display:flex; gap:10px; align-items:center;">
+                    <button id="loginBtn" onclick="login()">Enter Boardroom</button>
+                    <span id="loginStatus" class="status"></span>
+                </div>
+            </article>
+
+            <article id="queryCard" class="card hidden">
+                <h2>Submit Query</h2>
+                <label for="taskInput">High-stakes task</label>
+                <textarea id="taskInput" placeholder="e.g., Deploy database migration to production after backup validation."></textarea>
+                <div style="margin-top:10px; display:flex; gap:10px; align-items:center;">
+                    <button id="submitBtn" onclick="submitTask()">Run Board Vote</button>
+                    <span id="requestStatus" class="status"></span>
+                </div>
+
+                <div id="result" class="hidden" style="margin-top:12px;">
+                    <div><strong>Status:</strong> <span id="statusBadge" class="badge">PENDING</span></div>
+                    <div style="margin-top:8px;"><strong>Reason:</strong> <span id="reasonText"></span></div>
+                    <div style="margin-top:8px;"><strong>Cost:</strong> $<span id="costText">0.0000</span></div>
+                    <div id="voteGrid" class="votes"></div>
+                </div>
+            </article>
+        </section>
+    </main>
+
+    <script>
+        function login() {
+            const username = document.getElementById('username').value.trim();
+            const password = document.getElementById('password').value.trim();
+            const loginStatus = document.getElementById('loginStatus');
+
+            if (!username || !password) {
+                loginStatus.textContent = 'Enter both username and password.';
+                return;
+            }
+
+            loginStatus.textContent = `Signed in as ${username}.`;
+            document.getElementById('queryCard').classList.remove('hidden');
+            document.getElementById('loginCard').classList.add('hidden');
+        }
+
+        async function submitTask() {
+            const task = document.getElementById('taskInput').value.trim();
+            if (!task) {
+                document.getElementById('requestStatus').textContent = 'Enter a task before submitting.';
+                return;
+            }
+
+            const submitBtn = document.getElementById('submitBtn');
+            const requestStatus = document.getElementById('requestStatus');
+            submitBtn.disabled = true;
+            requestStatus.textContent = 'Running board vote...';
+
+            try {
+                const response = await fetch('/api/process', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ task })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Request failed (${response.status})`);
+                }
+
+                const data = await response.json();
+                renderResult(data);
+                requestStatus.textContent = 'Complete.';
+            } catch (error) {
+                requestStatus.textContent = `Error: ${error.message}`;
+            } finally {
+                submitBtn.disabled = false;
+            }
+        }
+
+        function renderResult(data) {
+            const result = document.getElementById('result');
+            const statusBadge = document.getElementById('statusBadge');
+            const voteGrid = document.getElementById('voteGrid');
+
+            result.classList.remove('hidden');
+            statusBadge.className = `badge ${data.status || 'FAILED'}`;
+            statusBadge.textContent = data.status || 'FAILED';
+            document.getElementById('reasonText').textContent = data.reason || 'No reason provided.';
+            document.getElementById('costText').textContent = Number(data.cost || 0).toFixed(4);
+
+            voteGrid.innerHTML = '';
+            (data.votes || []).forEach((vote) => {
+                const card = document.createElement('div');
+                card.className = `vote ${vote.vote ? 'yes' : 'no'}`;
+                card.innerHTML = `
+                    <strong>${vote.arm}</strong> ${vote.is_veto ? '(VETO)' : ''}<br>
+                    <span style="color:#93a7cf;">${vote.reasoning}</span>
+                `;
+                voteGrid.appendChild(card);
+            });
+        }
+    </script>
+</body>
+
+</html>
