@@ -1,0 +1,19 @@
+{
+  "name": "board-assistant",
+  "version": "1.0.0",
+  "description": "8-personality AI board assistant with majority consensus and chairman veto",
+  "main": "server/index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "node --watch server/index.js",
+    "lint": "node -e \"console.log('No linter configured yet')\""
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "express": "^4.21.2"
+  }
+}

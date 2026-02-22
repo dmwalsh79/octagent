@@ -1,37 +1,100 @@
-# 🐙 OctAgent
+# Board Assistant (8-Personality AI)
 
-> **"Eight Arms. One Mind. Zero Sleep."**
+An AI personal assistant that behaves like a board:
+- 7 voting members (different personalities)
+- 1 chairman with veto power
+- Majority rule for approval/rejection
+- Governed self-modification (board votes before applying changes)
 
-Most agents are a single persona acting as a junior developer. OctAgent is a committee. It spawns 8 concurrent sub-agents—each with an isolated cognitive persona, persistent memory shard, and area of ownership. They execute tasks, argue with each other, surface conflicts, and vote on high-stakes decisions. 
+## Why this model setup
+Recommended default stack:
+- `gpt-4o-mini` for all voting personalities (best cost/speed balance for multi-agent orchestration)
+- `gpt-4o` for chairman (higher reliability for veto/safety judgment)
+- `gpt-4.1-mini` fallback for transient or rate-limit failures
 
-Yes, this is intentional.
+This project includes retry + exponential backoff + model fallback routing to handle 429/rate-limit and transient API errors.
 
-## ⚙️ Architecture
+## Folder structure
 
-Instead of a standard iterative loop, OctAgent uses an **Asynchronous Fanout-and-Aggregate** pattern:
-1. **Fanout:** A task is broadcast to 8 isolated LLM sessions concurrently via `asyncio.TaskGroup`.
-2. **Cognition:** Each arm evaluates the task strictly through its YAML-defined persona.
-3. **Aggregation:** A `ConsensusLayer` calculates a quorum (default 5/8).
-4. **Veto:** The Bouncer arm possesses strict veto power to halt execution on unsafe commands.
+```
+.
+├── public/
+│   ├── index.html        # Landing page UI
+│   ├── styles.css        # Styling
+│   └── app.js            # Browser logic for ask + self-modify
+├── server/
+│   ├── index.js          # Express server bootstrap
+│   ├── routes/
+│   │   └── api.js        # API endpoints
+│   └── board/
+│       ├── personalities.json  # 8 personality definitions
+│       ├── prompts.js          # System prompt templates
+│       ├── aiClient.js         # AI calls + retries + fallback
+│       ├── boardEngine.js      # Majority + chairman veto orchestration
+│       ├── selfModify.js       # Governed self-editing scope
+│       └── audit.js            # JSONL audit logging
+├── data/
+│   └── audit-log.jsonl    # Runtime decision/audit events (generated)
+├── .env.example
+├── package.json
+└── README.md
+```
 
-## 🚀 Getting Started
+## Quick start
 
-Requires **Python 3.11+** (for `asyncio.TaskGroup`).
+1. Install dependencies
+```bash
+npm install
+```
 
-1. Clone the repository.
-2. Install dependencies: `pip install -r requirements.txt`
-3. Copy `.env.example` to `.env` and add your LLM API keys.
-4. Run a test quorum: `python -m core.orchestrator`
+2. Configure environment
+```bash
+cp .env.example .env
+# then edit .env with your OPENAI_API_KEY
+```
 
-## 🧠 The Boardroom (Default Arms)
+3. Run
+```bash
+npm run dev
+```
 
-| Arm | Persona | Domain | Veto Power |
-| :--- | :--- | :--- | :--- |
-| 🔴 **Critic** | Devil's Advocate | Code Review | No |
-| 🟢 **Builder** | Ship-it Energy | File Ops | No |
-| 🔵 **Archivist** | Memory Keeper | Documentation | No |
-| 🟡 **Scout** | Web Forager | Research | No |
-| 🟣 **Diplomat** | Comms Drafter | Messaging | No |
-| 🟠 **Accountant** | Optimizer | Budgets/Cost | No |
-| ⚪ **Dreamer** | Idea Generator | Brainstorming | No |
-| ⚫ **Bouncer** | Guardrail | Security | **Yes** |
+4. Open
+- `http://localhost:3000`
+
+## API
+
+### `POST /api/ask`
+Body:
+```json
+{
+  "question": "Should we launch this feature next week?",
+  "taskType": "product"
+}
+```
+
+Returns: votes from 7 members, chairman decision, majority summary, veto status, and final verdict.
+
+### `POST /api/self-modify`
+Body:
+```json
+{
+  "governanceQuestion": "Should we update the architect style prompt?",
+  "proposal": {
+    "targetPersonalityId": "architect",
+    "appendToStyle": "Prioritize API contract tests in all plans."
+  }
+}
+```
+
+If and only if board governance approves (and chairman does not veto), a controlled edit is applied to `server/board/personalities.json`.
+
+## Safety constraints on self-modification
+
+- Edits are scoped to one file (`SELF_MOD_SCOPE`, default `server/board/personalities.json`)
+- Proposal format is restricted to style append actions
+- All decisions are audit-logged to `data/audit-log.jsonl`
+
+## Notes
+
+- This is a strong starter architecture for a board-style assistant.
+- For production use, add auth, request quotas, stronger policy filters, durable queueing, and full test coverage.
